@@ -78,7 +78,7 @@ class StringAlign():
 		s = ""
 		for i, j in combinations(range(n), 2):
 			ans = state.Dict[(i, j)]
-			s += "string\n{}\n{}\nhas similarity {}\nfix points are: {}\n\n".format(join(l[i]), join(l[j]), ans[0], [tuple(i) for i in ans[1]])
+			s += "string {}\n{}\n{}\nhas similarity {}\nfix points are: {}\n\n".format((i, j), join(l[i]), join(l[j]), ans[0], [tuple(i) for i in ans[1]])
 		return s[:-2]
 	def evaluate(self, param : Param):
 		l = self._l
@@ -133,7 +133,7 @@ class StringAlign():
 		return similarity, anchors_to_choose
 
 p = Param()
-way = 'wayne'
+way = 'james'
 if way == 'wayne':
 	p.init_value = 0.0
 	p.base_point = lambda l1, l2: 1 / (len(l1) + len(l2) + 1)
@@ -149,7 +149,7 @@ elif way == 'james':
 	p.merge_point = lambda l, r, a1, a2: a1[0] + a2[0] + 2
 
 S = StringAlign()
-S += ["a b c d", "a c d", "d c d", "a b c d e"]
+S += ['a b c a d', 'b a d', 'a c a d a', 'a b a']
 
 S.evaluate(p)
 print(S)
