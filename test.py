@@ -38,9 +38,13 @@ class StringAlign():
 	State = namedtuple("State", "length Dict")
 	join = staticmethod(lambda l: " ".join(l))
 	def __init__(self, *args):
-		self._l = []
 		self._state = None
-		self.push(*args)
+		if len(args) > 0 and type(args[0]) is type(self): #copy and push
+			self._l = args[0]._l[:]
+			self.push(*args[1:])
+		else:
+			self._l = []
+			self.push(*args)
 	def push(self, *args):
 		l = []
 		for i in args:
@@ -50,9 +54,22 @@ class StringAlign():
 				l.extend(i)
 		l = [self.c3.sub("", self.c2.sub(" ", self.c1.sub(R" \1 ", s))).split() for s in l]
 		self._l.extend(l)
-	def __add__(self, *args):
-		self.push(*args)
+	def push_list(self, l):
+		self.push(l)
+	def concat(self, n):
+		self._l.extend(n._l)
+	def __iadd__(self, n):
+		if type(n) is not type(self):
+			self.push_list(n)
+		else:
+			self.concat(n)
 		return self
+	def __add__(self, n):
+		sol = type(self)(self) #create a copy
+		sol.__iadd__(n)
+		return sol
+	def __radd__(self, n):
+		return self.__add__(n)
 	def __str__(self):
 		state, l, join = self._state, self._l, self.join
 		if state is None:
