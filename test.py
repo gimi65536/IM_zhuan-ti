@@ -1,8 +1,11 @@
 import re
 import numpy as np
 from itertools import combinations, product
-from typing import List
+from typing import List, Tuple, Any
 from collections import namedtuple
+
+AnchorType = np.ndarray
+ScoreType = Any #float, int, etc. #Ord Scoretypr #C++ concept: LessThanComparable
 
 class Param():
 	__slot__ = ('_init_value', '_base_point', '_merge_point')
@@ -94,17 +97,17 @@ class StringAlign():
 		anchors = cls._anchors(l1, l2)
 		return cls._compare_detail(l1, l2, param, anchors)
 	@staticmethod
-	def _anchors(l1 : List[str], l2 : List[str]):
+	def _anchors(l1 : List[str], l2 : List[str]) -> List[AnchorType]:
 		s = set(l1)
 		s &= set(l2)
 		sol = []
 		for c in s:
 			i1, i2 = np.argwhere(np.array(l1) == c).reshape([-1]), np.argwhere(np.array(l2) == c).reshape([-1])
-			sol.extend(list(product(i1, i2)))
+			sol.extend([np.array(i) for i in product(i1, i2)])
 		return sol
 	@classmethod
-	def _compare_split(cls, l1 : List[str], l2 : List[str], param : Param, anchors : List[np.ndarray], now_anchor : np.ndarray):
-		#return float, List[anchor] as highest similarity, anchors
+	def _compare_split(cls, l1 : List[str], l2 : List[str], param : Param, anchors : List[AnchorType], now_anchor : AnchorType) -> Tuple[ScoreType, List[AnchorType]]:
+		#return (float, List[anchor]) as the highest similarity, anchors
 		if now_anchor is None: #base case
 			return param.base_point(l1, l2), []
 		#print(now_anchor)
@@ -118,7 +121,7 @@ class StringAlign():
 		sol_simi = param.merge_point(left_child, right_child, left_ans, right_ans)
 		return sol_simi, sol_anchor
 	@classmethod
-	def _compare_detail(cls, l1 : List[str], l2 : List[str], param : Param, anchors : List[np.ndarray]):
+	def _compare_detail(cls, l1 : List[str], l2 : List[str], param : Param, anchors : List[AnchorType]) -> Tuple[ScoreType, List[AnchorType]]:
 		similarity, anchors_to_choose = param.init_value, []
 		if len(anchors) == 0:
 			simi, use_anchors = cls._compare_split(l1, l2, param, anchors, None) #call base case
