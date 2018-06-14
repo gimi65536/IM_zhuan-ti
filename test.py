@@ -44,17 +44,17 @@ class Param():
 		self._base_confidence = n
 	@property
 	def score_map(self):
-		return self._score_map if self._score_map is not None else lambda c, state: {i: j[0] for i, j in state.Dict.items()}
+		return self._score_map if self._score_map is not None else lambda c, state: {i: j.similarity for i, j in state.Dict.items()}
 	@score_map.setter
 	def score_map(self, f):
-		#f :: List[float] -> State[int, Dict[(int, int): (float, List[anchor])]] -> Dict[(int, int): float]
+		#f :: List[float] -> State[int, Dict[(int, int): Ans(float, List[anchor])]] -> Dict[(int, int): float]
 		self._score_map = f
 
 class StringAlign():
 	c1, c2, c3 = re.compile(R"([^\w\s'])"), re.compile(R"\s+"), re.compile(R"^\s|\s$")
 	init_similarity = 0
 	State = namedtuple("State", "length Dict")
-	Ans = namedtuple('Ans', "similarity, anchors")
+	Ans = namedtuple('Ans', "similarity anchors")
 	join = staticmethod(lambda l: " ".join(l))
 	def __init__(self, *args):
 		self._state = None
@@ -122,7 +122,7 @@ class StringAlign():
 		sentences_set = disjoint_set.from_iterable(range(n))
 		word_set = disjoint_set.from_iterable(chain.from_iterable([(i, j) for j in range(len(self._l[i]))] for i in range(n)))
 		#print(word_set)
-		pairs = sorted(state.Dict.keys(), key = (lambda k: state.Dict[k].similarity), reverse = True)
+		pairs = sorted(state.Dict.keys(), key = (lambda k: scores[k]), reverse = True)
 		for i, j in pairs:
 			if sentences_set.is_same(i, j):
 				continue
@@ -131,7 +131,11 @@ class StringAlign():
 				word_set.union((i, k), (j, l))
 			sentences_set.union(i, j)
 		print(word_set)
+		sets = word_set.sets()
 		#print(sentences_set) #all the sentences should become same
+		#below is the other world...
+		import networkx as nx
+		...
 	@classmethod
 	def compare(cls, l1 : List[str], l2 : List[str], param : Param):
 		anchors = cls._anchors(l1, l2)
