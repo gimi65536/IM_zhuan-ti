@@ -1,6 +1,6 @@
 import re
 import numpy as np
-from itertools import combinations, product
+from itertools import combinations, product, chain
 from typing import List, Tuple, Any
 from collections import namedtuple
 from disjoint_set import disjoint_set
@@ -9,11 +9,13 @@ AnchorType = np.ndarray
 ScoreType = Any #float, int, etc. #Ord Scoretypr #C++ concept: LessThanComparable
 
 class Param():
-	__slots__ = ('_init_value', '_base_point', '_merge_point')
-	def __init__(self, init_value = None, base_point = None, merge_point = None):
+	__slots__ = ('_init_value', '_base_point', '_merge_point', '_base_confidence', '_score_map')
+	def __init__(self, init_value = None, base_point = None, merge_point = None, base_confidence = 1, score_map = None):
 		self._init_value = init_value
 		self._base_point = base_point
 		self._merge_point = merge_point
+		self._base_confidence = base_confidence
+		self._score_map = score_map
 	@property
 	def init_value(self):
 		return self._init_value
@@ -34,12 +36,25 @@ class Param():
 	def merge_point(self, f):
 		#f :: (List[str], List[str]) -> (List[str], List[str]) -> (float, List[anchor]) -> (float, List[anchor]) -> float
 		self._merge_point = f
-	
+	@property
+	def base_confidence(self):
+		return self._base_confidence
+	@base_confidence.setter
+	def base_confidence(self, n):
+		self._base_confidence = n
+	@property
+	def score_map(self):
+		return self._score_map if self._score_map is not None else lambda c, state: {i: j[0] for i, j in state.Dict.items()}
+	@score_map.setter
+	def score_map(self, f):
+		#f :: List[float] -> State[int, Dict[(int, int): (float, List[anchor])]] -> Dict[(int, int): float]
+		self._score_map = f
 
 class StringAlign():
 	c1, c2, c3 = re.compile(R"([^\w\s'])"), re.compile(R"\s+"), re.compile(R"^\s|\s$")
 	init_similarity = 0
 	State = namedtuple("State", "length Dict")
+	Ans = namedtuple('Ans', "similarity, anchors")
 	join = staticmethod(lambda l: " ".join(l))
 	def __init__(self, *args):
 		self._state = None
@@ -82,8 +97,7 @@ class StringAlign():
 		s = ""
 		for i, j in combinations(range(n), 2):
 			ans = state.Dict[(i, j)]
-			#s += "string {}\n{}\n{}\nhas similarity {}\nfix points are: {}\n\n".format((i, j), join(l[i]), join(l[j]), ans[0], [tuple(i) for i in ans[1]])
-			s += f"string {(i, j)}\n{join(l[i])}\n{join(l[j])}\nhas similarity {ans[0]}\nfix points are: {[tuple(i) for i in ans[1]]}\n\n"
+			s += f"string {(i, j)}\n{join(l[i])}\n{join(l[j])}\nhas similarity {ans.similarity}\nfix points are: {[tuple(i) for i in ans.anchors]}\n\n"
 		return s[:-2]
 	def evaluate(self, param : Param):
 		l = self._l
@@ -91,11 +105,33 @@ class StringAlign():
 		state = self.__class__.State(n, dict())
 		for i, j in combinations(range(n), 2):
 			get = self.__class__.compare(l[i], l[j], param)
-			get = get[0], list(get[1])
+			#get = get[0], list(get[1])
 			state.Dict[(i, j)] = get
 		self._state = state
-	def big_anchor_concat_heuristic(self):
-		pass
+	def big_anchor_concat_heuristic(self, param : Param, confidence : list = None):
+		"""
+		provisional big-anchor function
+		"""
+		if self._state is None: #exception-like condition, maybe NoStateException
+			print('No state is ready!')
+			return
+		state, n = self._state, self._state.length
+		if confidence is None or len(confidence) != n:
+			confidence = [param.base_confidence] * n
+		scores = param.score_map(confidence, state)
+		sentences_set = disjoint_set.from_iterable(range(n))
+		word_set = disjoint_set.from_iterable(chain.from_iterable([(i, j) for j in range(len(self._l[i]))] for i in range(n)))
+		#print(word_set)
+		pairs = sorted(state.Dict.keys(), key = (lambda k: state.Dict[k].similarity), reverse = True)
+		for i, j in pairs:
+			if sentences_set.is_same(i, j):
+				continue
+			anchors = state.Dict[(i, j)].anchors
+			for k, l in anchors:
+				word_set.union((i, k), (j, l))
+			sentences_set.union(i, j)
+		print(word_set)
+		#print(sentences_set) #all the sentences should become same
 	@classmethod
 	def compare(cls, l1 : List[str], l2 : List[str], param : Param):
 		anchors = cls._anchors(l1, l2)
@@ -134,7 +170,7 @@ class StringAlign():
 				             ans :: return type of _compare_xxx
 			anchors
 			now_anchor: meaning which anchor is fixed at the very step.
-		output: ans :: (float, List[anchor]), as the highest similarity, anchors, same as _compare_detail
+		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_detail
 		"""
 		if now_anchor is None: #base case
 			return param.base_point(l1, l2), []
@@ -144,9 +180,9 @@ class StringAlign():
 		right_anchor = [anchor - now_anchor - 1 for anchor in anchors if np.all(anchor > now_anchor)]
 		left_ans = cls._compare_detail(*left_child, param, left_anchor)
 		right_ans = cls._compare_detail(*right_child, param, right_anchor)
-		sol_anchor = left_ans[1] + [now_anchor] + [anchor + now_anchor + 1 for anchor in right_ans[1]]
+		sol_anchor = left_ans.anchors + [now_anchor] + [anchor + now_anchor + 1 for anchor in right_ans.anchors]
 		sol_simi = param.merge_point(left_child, right_child, left_ans, right_ans)
-		return sol_simi, sol_anchor
+		return cls.Ans(sol_simi, sol_anchor)
 	@classmethod
 	def _compare_detail(cls, l1 : List[str], l2 : List[str], param : Param, anchors : List[AnchorType]) -> Tuple[ScoreType, List[AnchorType]]:
 		"""
@@ -160,7 +196,7 @@ class StringAlign():
 			param: init_value is used here.
 				init_value: the starting point(score) meaning the lower bound of scoring algorithm
 			anchors
-		output: ans :: (float, List[anchor]), as the highest similarity, anchors, same as _compare_split
+		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_split
 		"""
 		similarity, anchors_to_choose = param.init_value, []
 		if len(anchors) == 0:
@@ -171,7 +207,7 @@ class StringAlign():
 			simi, use_anchors = cls._compare_split(l1, l2, param, anchors, np.array(anchor))
 			if simi > similarity:
 				similarity, anchors_to_choose = simi, use_anchors
-		return similarity, anchors_to_choose
+		return cls.Ans(similarity, anchors_to_choose)
 
 p = Param()
 way = 'james'
@@ -181,13 +217,13 @@ if way == 'wayne':
 	def merge_point(left, right, ans1, ans2):
 		left_len = len(left[0]) + len(left[1])
 		right_len = len(right[0]) + len(right[1])
-		left_point, right_point = ans1[0], ans2[0]
+		left_point, right_point = ans1.similarity, ans2.similarity
 		return (left_point * left_len + right_point * right_len + 2) / (left_len + right_len + 2)
 	p.merge_point = merge_point
 elif way == 'james':
 	p.init_value = -np.inf
 	p.base_point = lambda l1, l2: -(len(l1) + len(l2))
-	p.merge_point = lambda l, r, a1, a2: a1[0] + a2[0] + 2
+	p.merge_point = lambda l, r, a1, a2: a1.similarity + a2.similarity + 2
 
 if __name__ == '__main__':
 	S = StringAlign()
@@ -195,3 +231,4 @@ if __name__ == '__main__':
 
 	S.evaluate(p)
 	print(S)
+	S.big_anchor_concat_heuristic(p)

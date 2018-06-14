@@ -15,11 +15,16 @@ class disjoint_set():
 	def __init__(self, *args):
 		self._dict = dict()
 		self.push(*args)
+	@classmethod
+	def from_iterable(cls, l):
+		return cls(*l)
 	def push(self, *args):
 		for i in args:
 			if i in self._dict:
 				continue
 			self._dict[i] = _node()
+	def push_iterable(self, l):
+		self.push(*l)
 	def find(self, n):
 		if n not in self._dict:
 			return None
@@ -51,6 +56,19 @@ class disjoint_set():
 		d = self.sets()
 		s = [f"{{{', '.join([str(i) for i in l])}}}" for l in d]
 		return f"{{{', '.join(s)}}}"
+	def rebuild(self):
+		d = self.sets()
+		for l in d:
+			if len(l) == 1:
+				self._dict[l[0]] = _node()
+			else:
+				n = _node()
+				n.rank = 1
+				self._dict[l[0]] = n
+				for k in l[1:]:
+					p = _node()
+					p.concat(n)
+					self._dict[k] = p
 
 if __name__ == '__main__':
 	#test
