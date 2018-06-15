@@ -43,14 +43,18 @@ class disjoint_set():
 			i.concat(j)
 			if i.rank == j.rank:
 				j.rank += 1
-	def sets(self):
-		d = self._dict
+	def index(self): #many to one
+		return {key: id(node.find_root()) for key, node in self._dict.items()}
+	def reversed_index(self): #one to many, so using list
+		index = self.index()
 		dic = dict()
-		for key, node in d.items():
-			ptr = node.find_root()
-			if id(ptr) not in dic:
-				dic[id(ptr)] = []
-			dic[id(ptr)].append(key)
+		for key, i in index.items():
+			if i not in dic:
+				dic[i] = []
+			dic[i].append(key)
+		return dic
+	def sets(self):
+		dic = self.reversed_index()
 		return dic.values()
 	def __str__(self):
 		d = self.sets()

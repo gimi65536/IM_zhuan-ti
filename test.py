@@ -58,6 +58,7 @@ class StringAlign():
 	join = staticmethod(lambda l: " ".join(l))
 	def __init__(self, *args):
 		self._state = None
+		self._word_set = None
 		if len(args) > 0 and type(args[0]) is type(self): #copy and push
 			self._l = args[0]._l[:]
 			self.push(*args[1:])
@@ -131,11 +132,43 @@ class StringAlign():
 				word_set.union((i, k), (j, l))
 			sentences_set.union(i, j)
 		print(word_set)
-		sets = word_set.sets()
+		self._word_set = word_set
+		return {'word_set': word_set}
+		#this function should return one that contains word_set
+		#sets = list(word_set.sets())
 		#print(sentences_set) #all the sentences should become same
-		#below is the other world...
-		import networkx as nx
-		...
+	def print_big_anchor(self, word_set : disjoint_set = None):
+		"""
+		test function to represent the solution
+		"""
+		if self._state is None: #exception-like condition, maybe NoStateException
+			print('No state is ready!')
+			return
+		state, n = self._state, self._state.length
+		if word_set is None:
+			if self._word_set is None:
+				return
+			word_set = self._word_set
+		try:
+			import networkx as nx
+		except:
+			print('module networkx is not installed!')
+			return
+		G = nx.DiGraph()
+		index = word_set.index()
+		for i in range(n):
+			G.add_node(index[(i, 0)], length = len(self._l[i][0]))
+			for j, word in enumerate(self._l[i][1:], 1):
+				G.add_edge(index[(i, j - 1)], index[(i, j)])
+				G.nodes[index[(i, j)]]['length'] = len(self._l[i][j])
+		id_list = list(nx.algorithms.dag.topological_sort(G))
+		id_dict = {j: i for i, j in enumerate(id_list)}
+		id_len = {i: G.nodes[i]['length'] for i in id_list}
+		str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
+		for i in range(n):
+			for j, word in enumerate(self._l[i]):
+				str_list[i][id_dict[index[(i, j)]]] = word
+		print('\n'.join([' '.join(s) for s in str_list]))
 	@classmethod
 	def compare(cls, l1 : List[str], l2 : List[str], param : Param):
 		anchors = cls._anchors(l1, l2)
@@ -236,3 +269,4 @@ if __name__ == '__main__':
 	S.evaluate(p)
 	print(S)
 	S.big_anchor_concat_heuristic(p)
+	S.print_big_anchor()
