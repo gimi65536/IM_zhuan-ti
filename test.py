@@ -58,7 +58,7 @@ class StringAlign():
 	join = staticmethod(lambda l: " ".join(l))
 	def __init__(self, *args):
 		self._state = None
-		self._word_set = None
+		self._big_anchor_state = None
 		if len(args) > 0 and type(args[0]) is type(self): #copy and push
 			self._l = args[0]._l[:]
 			self.push(*args[1:])
@@ -132,8 +132,8 @@ class StringAlign():
 				word_set.union((i, k), (j, l))
 			sentences_set.union(i, j)
 		print(word_set)
-		self._word_set = word_set
-		return {'word_set': word_set}
+		self._big_anchor_state = {'word_set': word_set}
+		return self._big_anchor_state
 		#this function should return one that contains word_set
 		#sets = list(word_set.sets())
 		#print(sentences_set) #all the sentences should become same
@@ -146,9 +146,10 @@ class StringAlign():
 			return
 		state, n = self._state, self._state.length
 		if word_set is None:
-			if self._word_set is None:
+			if self._big_anchor_state is None:
+				print('No big anchor state is ready!')
 				return
-			word_set = self._word_set
+			word_set = self._big_anchor_state['word_set']
 		try:
 			import networkx as nx
 		except:
