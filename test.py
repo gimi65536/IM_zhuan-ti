@@ -59,12 +59,8 @@ class StringAlign():
 	def __init__(self, *args):
 		self._state = None
 		self._big_anchor_state = None
-		if len(args) > 0 and type(args[0]) is type(self): #copy and push
-			self._l = args[0]._l[:]
-			self.push(*args[1:])
-		else:
-			self._l = []
-			self.push(*args)
+		self._l = []
+		self.push(*args)
 	def push(self, *args):
 		l = []
 		for i in args:
@@ -85,7 +81,7 @@ class StringAlign():
 			self.concat(n)
 		return self
 	def __add__(self, n):
-		sol = type(self)(self) #create a copy
+		sol = self.copy() #create a copy
 		sol.__iadd__(n)
 		return sol
 	def __radd__(self, n):
@@ -100,6 +96,17 @@ class StringAlign():
 			ans = state.Dict[(i, j)]
 			s += f"string {(i, j)}\n{join(l[i])}\n{join(l[j])}\nhas similarity {ans.similarity}\nfix points are: {[tuple(i) for i in ans.anchors]}\n\n"
 		return s[:-2]
+	@property
+	def sentences(self): #equivalent to self[:]
+		return self[:]
+	def __getitem__(self, val):
+		if isinstance(val, slice):
+			return [self.__class__.join(i) for i in self._l[val]]
+		return self.__class__.join(self._l[val])
+	def copy(self):
+		sol = type(self)()
+		sol._l = self._l.copy()
+		return sol
 	def evaluate(self, param : Param):
 		l = self._l
 		n = len(l)
@@ -152,7 +159,7 @@ class StringAlign():
 			word_set = self._big_anchor_state['word_set']
 		try:
 			import networkx as nx
-		except:
+		except ImportError: #precisely, ModuleNotFoundError in Py3.6
 			print('module networkx is not installed!')
 			return
 		G = nx.DiGraph()
@@ -248,7 +255,7 @@ class StringAlign():
 		return cls.Ans(similarity, anchors_to_choose)
 
 p = Param()
-way = 'james'
+way = 'wayne'
 if way == 'wayne':
 	p.init_value = 0.0
 	p.base_point = lambda l1, l2: 1 / (len(l1) + len(l2) + 1)
