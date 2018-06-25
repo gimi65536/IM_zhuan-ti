@@ -5,11 +5,11 @@ class _node():
 	def concat(self, ptr):
 		self.ptr = ptr
 	def find_root(self):
-		ptr = self
-		while True:
-			if ptr.ptr is None:
-				return ptr
-			ptr = ptr.ptr
+		if self.ptr is None:
+			return self
+		ptr = self.ptr.find_root()
+		self.ptr = ptr
+		return ptr
 
 class disjoint_set():
 	def __init__(self, *args):
@@ -60,26 +60,38 @@ class disjoint_set():
 		d = self.sets()
 		s = [f"{{{', '.join([str(i) for i in l])}}}" for l in d]
 		return f"{{{', '.join(s)}}}"
-	def rebuild(self):
+	def _rebuild_dict(self):
 		d = self.sets()
+		_dict = dict()
 		for l in d:
 			if len(l) == 1:
-				self._dict[l[0]] = _node()
+				_dict[l[0]] = _node()
 			else:
 				n = _node()
 				n.rank = 1
-				self._dict[l[0]] = n
+				_dict[l[0]] = n
 				for k in l[1:]:
 					p = _node()
 					p.concat(n)
-					self._dict[k] = p
+					_dict[k] = p
+		return _dict
+	def copy(self):
+		sol = type(self)()
+		sol._dict = self._rebuild_dict()
+		return sol
+	def rebuild(self):
+		self._dict = self._rebuild_dict()
 
 if __name__ == '__main__':
-	#test
-	x = disjoint_set(*range(10))
-	x.union(0, 2)
-	print(x.is_same(0, 2), x.is_same(0, 3))
-	print(x)
-	x.union(2, 3)
-	print(x.is_same(0, 2), x.is_same(0, 3))
-	print(x)
+	print('This is used for test.')
+	_x = ['x = disjoint_set(*range(10))',
+	'x.union(0, 2)',
+	'print(x.is_same(0, 2), x.is_same(0, 3))',
+	'print(x)',
+	'x.union(2, 3)',
+	'print(x.is_same(0, 2), x.is_same(0, 3))',
+	'print(x)',
+	]
+	for _i in _x:
+		print(f'{_i}: ', end = '')
+		print(exec(_i))
