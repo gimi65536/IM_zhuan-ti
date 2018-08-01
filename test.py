@@ -150,7 +150,7 @@ class StringAlign():
 		#this function should return one that contains word_set
 		#sets = list(word_set.sets())
 		#print(sentences_set) #all the sentences should become same
-	def big_anchor_concat_james(self):
+	def big_anchor_concat_james(self, *args, **kwargs):
 		if self._state is None: #exception-like condition, maybe NoStateException
 			print('No state is ready!')
 			return
@@ -313,7 +313,10 @@ class StringAlign():
 						left_strings.append(strings[3][0:sticks[1][bottom_stick_index][3]])
 						right_strings.append(strings[3][sticks[1][bottom_stick_index][3] + 1:strings_len[3]])
 						left_sticks.append(sticks[1][0:bottom_stick_index])
-						right_sticks.append(sticks[1][bottom_stick_index + 1:len(sticks[1])])
+						if bottom_stick_index + 1 >= 0:
+							right_sticks.append(sticks[1][bottom_stick_index + 1:len(sticks[1])])
+						else:
+							right_sticks.append([])
 						
 						left_shifts = shifts
 						right_shifts = [shifts[0] + 1 + top_stick[0], shifts[1] + 1 + top_stick[1], shifts[2] + 1 + string2_index, shifts[3] + 1 + sticks[1][bottom_stick_index][3]]
@@ -356,7 +359,10 @@ class StringAlign():
 						left_strings.append(strings[3][0:string3_start_right_index])
 						right_strings.append(strings[3][string3_start_right_index:strings_len[3]])
 						left_sticks.append(sticks[1][0:bottom_stick_index_before + 1])
-						right_sticks.append(sticks[1][bottom_stick_index_after:len(sticks[1])])
+						if bottom_stick_index_after >= 0:
+							right_sticks.append(sticks[1][bottom_stick_index_after:len(sticks[1])])
+						else:
+							right_sticks.append([])
 						
 						left_shifts = shifts
 						right_shifts = [shifts[0] + 1 + top_stick[0], shifts[1] + 1 + top_stick[1], shifts[2] + 1 + string2_index, shifts[3] + 1 + string3_start_right_index-1]
@@ -419,7 +425,10 @@ class StringAlign():
 						left_strings.insert(2, strings[2][0:string2_start_right_index])
 						right_strings.insert(2, strings[2][string2_start_right_index:strings_len[2]])
 						left_sticks.insert(2, sticks[1][0:bottom_stick_index_before + 1])
-						right_sticks.insert(2, sticks[1][bottom_stick_index_after:len(sticks[1])])
+						if bottom_stick_index_after >= 0:
+							right_sticks.insert(2, sticks[1][bottom_stick_index_after:len(sticks[1])])
+						else:
+							right_sticks.insert(2, [])
 						
 						left_shifts = shifts
 						right_shifts = [shifts[0] + 1 + top_stick[0], shifts[1] + 1 + top_stick[1], shifts[2] + 1 + string2_start_right_index-1, shifts[3] + 1 + string3_index]
@@ -443,6 +452,7 @@ class StringAlign():
 		
 		#base case
 		if find_stick == False:
+			top_stick_number = len(sticks[0])
 			bottom_stick_number = len(sticks[1])
 			max_score = -1*(strings_len[0] + strings_len[1] + strings_len[2] + strings_len[3]) + bottom_stick_number * 2 * 2
 		
@@ -453,19 +463,17 @@ class StringAlign():
 						sticks[i][j][k] += shifts_diff[k]
 
 		return max_score, best_sticks
-	def print_big_anchor(self, word_set: disjoint_set = None):
-		"""
-		test function to represent the solution
-		"""
+	def give_graph(self):
 		if self._state is None: #exception-like condition, maybe NoStateException
 			print('No state is ready!')
 			return
 		state, n = self._state, self._state.length
-		if word_set is None:
-			if self._big_anchor_state is None:
-				print('No big anchor state is ready!')
-				return
-			word_set = self._big_anchor_state['word_set']
+		if self._big_anchor_state is None:
+			print('No big anchor state is ready!')
+			return
+		if 'graph' in self._big_anchor_state:
+			return self._big_anchor_state['graph']
+		word_set = self._big_anchor_state['word_set']
 		try:
 			import networkx as nx
 		except ImportError: #precisely, ModuleNotFoundError in Py3.6
@@ -474,18 +482,46 @@ class StringAlign():
 		G = nx.DiGraph()
 		index = word_set.index()
 		for i in range(n):
-			G.add_node(index[(i, 0)], length = len(self._l[i][0]))
+			G.add_node(index[(i, 0)], word = self._l[i][0])
 			for j, word in enumerate(self._l[i][1:], 1):
 				G.add_edge(index[(i, j - 1)], index[(i, j)])
-				G.nodes[index[(i, j)]]['length'] = len(self._l[i][j])
-		id_list = list(nx.algorithms.dag.topological_sort(G))
-		id_dict = {j: i for i, j in enumerate(id_list)}
-		id_len = {i: G.nodes[i]['length'] for i in id_list}
-		str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
-		for i in range(n):
+				G.nodes[index[(i, j)]]['word'] = word
 			for j, word in enumerate(self._l[i]):
-				str_list[i][id_dict[index[(i, j)]]] = word
+				if 'appearance' not in G.nodes[index[(i, j)]]:
+					G.nodes[index[(i, j)]]['appearance'] = []
+				G.nodes[index[(i, j)]]['appearance'].append(i)
+		self._big_anchor_state['graph'] = G
+		return G
+	def print_big_anchor(self):
+		"""
+		test function to represent the solution
+		"""
+		G = self.give_graph()
+		if G is None:
+			print('Fail to print big anchor.')
+			return
+		n = self._state.length
+		import networkx as nx
+		id_list = list(nx.algorithms.dag.topological_sort(G))
+		id_len = {i: len(G.nodes[i]['word']) for i in id_list}
+		str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
+		for i, word_id in enumerate(id_list):
+			node = G.nodes[word_id]
+			word = node['word']
+			for s in node['appearance']:
+				str_list[s][i] = word
 		print('\n'.join([' '.join(s) for s in str_list]))
+	def final_result(self, weight, threshold):
+		G = self.give_graph()
+		if G is None:
+			print('Fail to get final result.')
+			return
+		import networkx as nx
+		n = self._state.length
+		str_len = len(G)
+		id_list = list(nx.algorithms.dag.topological_sort(G))
+		votes = map(lambda word_id: sum(weight[s] for s in G.nodes[word_id]['appearance']), id_list)
+		return (G.nodes[word_id]['word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
 	@classmethod
 	def compare(cls, l1: List[str], l2: List[str], param: Param):
 		anchors = cls._anchors(l1, l2)
@@ -564,7 +600,7 @@ class StringAlign():
 		return cls.Ans(similarity, anchors_to_choose)
 
 p = Param()
-way = 'wayne'
+way = 'james'
 if way == 'wayne':
 	p.init_value = 0.0
 	p.base_point = lambda l1, l2: 1 / (len(l1) + len(l2) + 1)
@@ -591,3 +627,5 @@ if __name__ == '__main__':
 	S.print_big_anchor()
 	print(x.sets())
 	print(x.copy().sets())
+	result = S.final_result([1.5, 1, 1, 1], 3)
+	print(list(result))
