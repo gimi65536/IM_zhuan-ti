@@ -33,8 +33,10 @@ class disjoint_set():
 		return self.find(m) is self.find(n)
 	def union(self, m, n):
 		i, j = self.find(m), self.find(n)
-		if i is None or j is None:
-			return
+		if i is None:
+			raise KeyError(f'{repr(m)} is not found!')
+		elif j is None:
+			raise KeyError(f'{repr(n)} is not found!')
 		if i is j:
 			return
 		if i.rank > j.rank:
@@ -46,11 +48,10 @@ class disjoint_set():
 	def index(self): #many to one
 		return {key: id(node.find_root()) for key, node in self._dict.items()}
 	def reversed_index(self): #one to many, so using list
+		from collections import defaultdict
 		index = self.index()
-		dic = dict()
+		dic = defaultdict(list)
 		for key, i in index.items():
-			if i not in dic:
-				dic[i] = []
 			dic[i].append(key)
 		return dic
 	def sets(self):
