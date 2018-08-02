@@ -53,6 +53,8 @@ class Param():
 
 class StringAlign():
 	c1, c2, c3 = re.compile(R"([^\w\s'])"), re.compile(R"\s+"), re.compile(R"^\s|\s$")
+	graph_module = None
+	graph_module_tryorder = ['networkx', 'pyswip']
 	init_similarity = 0
 	State = namedtuple("State", "length Dict")
 	Ans = namedtuple('Ans', "similarity anchors")
@@ -113,6 +115,19 @@ class StringAlign():
 		sol = type(self)()
 		sol._l = self._l.copy() #
 		return sol
+	@classmethod
+	def decide_graph_module(cls):
+		if cls.graph_module is not None:
+			return
+		for module in cls.graph_module_tryorder:
+			try:
+				exec(f'import {module}')
+			except ImportError: #precisely, ModuleNotFoundError in Py3.6
+				continue
+			else:
+				cls.graph_module = module
+				return
+		print('No module in {} has been installed!'.format(', '.join(cls.graph_module_tryorder)))
 	def evaluate(self, param: Param):
 		l = self._l
 		n = len(l)
@@ -474,24 +489,43 @@ class StringAlign():
 		if 'graph' in self._big_anchor_state:
 			return self._big_anchor_state['graph']
 		word_set = self._big_anchor_state['word_set']
-		try:
+		self.decide_graph_module()
+		if self.graph_module == 'networkx':
 			import networkx as nx
-		except ImportError: #precisely, ModuleNotFoundError in Py3.6
-			print('module networkx is not installed!')
+			G = nx.DiGraph()
+			index = word_set.index()
+			for i in range(n):
+				G.add_node(index[(i, 0)], word = self._l[i][0])
+				for j, word in enumerate(self._l[i][1:], 1):
+					G.add_edge(index[(i, j - 1)], index[(i, j)])
+					G.nodes[index[(i, j)]]['word'] = word
+				for j, word in enumerate(self._l[i]):
+					if 'appearance' not in G.nodes[index[(i, j)]]:
+						G.nodes[index[(i, j)]]['appearance'] = []
+					G.nodes[index[(i, j)]]['appearance'].append(i)
+			self._big_anchor_state['graph'] = G
+			return G
+		elif self.graph_module == 'pyswip':
+			from pyswip import Prolog
+			prolog = Prolog()
+			prolog.consult('knowledge.pl')
+			index = word_set.index()
+			id_word_map = {} #prevent overlapping
+			for i in range(n):
+				id_word_map[index[(i, 0)]] = self._l[i][0]
+				for j, word in enumerate(self._l[i][1:], 1):
+					prolog.assertz(f'edge({index[(i, j - 1)]}, {index[(i, j)]})')
+					id_word_map[index[(i, j)]] = word
+				for j in range(len(self._l[i])):
+					prolog.assertz(f'appear({index[(i, j)]}, {i})')
+			for word_id, word in id_word_map.items():
+				prolog.assertz(f"word({word_id}, '{word}')") #word is atom, not string
+			prolog.assertz('all_node([{}])'.format(', '.join([str(i) for i in id_word_map.keys()])))
+			self._big_anchor_state['graph'] = prolog
+			return prolog
+		elif self.graph_module is None:
+			print('Failed to draw graph!')
 			return
-		G = nx.DiGraph()
-		index = word_set.index()
-		for i in range(n):
-			G.add_node(index[(i, 0)], word = self._l[i][0])
-			for j, word in enumerate(self._l[i][1:], 1):
-				G.add_edge(index[(i, j - 1)], index[(i, j)])
-				G.nodes[index[(i, j)]]['word'] = word
-			for j, word in enumerate(self._l[i]):
-				if 'appearance' not in G.nodes[index[(i, j)]]:
-					G.nodes[index[(i, j)]]['appearance'] = []
-				G.nodes[index[(i, j)]]['appearance'].append(i)
-		self._big_anchor_state['graph'] = G
-		return G
 	def print_big_anchor(self):
 		"""
 		test function to represent the solution
@@ -501,27 +535,40 @@ class StringAlign():
 			print('Fail to print big anchor.')
 			return
 		n = self._state.length
-		import networkx as nx
-		id_list = list(nx.algorithms.dag.topological_sort(G))
-		id_len = {i: len(G.nodes[i]['word']) for i in id_list}
-		str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
-		for i, word_id in enumerate(id_list):
-			node = G.nodes[word_id]
-			word = node['word']
-			for s in node['appearance']:
-				str_list[s][i] = word
-		print('\n'.join([' '.join(s) for s in str_list]))
+		if self.graph_module == 'networkx':
+			import networkx as nx
+			id_list = list(nx.algorithms.dag.topological_sort(G))
+			id_len = {i: len(G.nodes[i]['word']) for i in id_list}
+			str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
+			for i, word_id in enumerate(id_list):
+				node = G.nodes[word_id]
+				word = node['word']
+				for s in node['appearance']:
+					str_list[s][i] = word
+			print('\n'.join([' '.join(s) for s in str_list]))
+		elif self.graph_module == 'pyswip':
+			query = next(G.query('all_node(L), topological_sort(L, Sol), grab_word(Sol, Words)'))
+			id_list, words = query['Sol'], [str(i) for i in query['Words']] #query['Words'] is a list of Atom object (this is a problem of pyswip), so call str() to make it string.
+			id_len = {i: len(word) for i, word in zip(id_list, words)}
+			str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
+			for i, (word_id, word) in enumerate(zip(id_list, words)):
+				for q in G.query(f'appear({word_id}, N)'):
+					str_list[q['N']][i] = word
+			print('\n'.join([' '.join(s) for s in str_list]))
 	def final_result(self, weight, threshold):
 		G = self.give_graph()
 		if G is None:
 			print('Fail to get final result.')
 			return
-		import networkx as nx
-		n = self._state.length
-		str_len = len(G)
-		id_list = list(nx.algorithms.dag.topological_sort(G))
-		votes = map(lambda word_id: sum(weight[s] for s in G.nodes[word_id]['appearance']), id_list)
-		return (G.nodes[word_id]['word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
+		if self.graph_module == 'networkx':
+			import networkx as nx
+			id_list = list(nx.algorithms.dag.topological_sort(G))
+			votes = map(lambda word_id: sum(weight[s] for s in G.nodes[word_id]['appearance']), id_list)
+			return (G.nodes[word_id]['word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
+		elif self.graph_module == 'pyswip':
+			id_list = next(G.query('all_node(L), topological_sort(L, Sol)'))['Sol']
+			votes = map(lambda word_id: sum(weight[q['N']] for q in G.query(f'appear({word_id}, N)')), id_list)
+			return (next(G.query(f'word({word_id}, Word)'))['Word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
 	@classmethod
 	def compare(cls, l1: List[str], l2: List[str], param: Param):
 		anchors = cls._anchors(l1, l2)
@@ -627,5 +674,5 @@ if __name__ == '__main__':
 	S.print_big_anchor()
 	print(x.sets())
 	print(x.copy().sets())
-	result = S.final_result([1.5, 1, 1, 1], 3)
+	result = S.final_result([1.5, 1, 1, 1], 2)
 	print(list(result))
