@@ -54,7 +54,7 @@ class Param():
 class StringAlign():
 	c1, c2, c3 = re.compile(R"([^\w\s'])"), re.compile(R"\s+"), re.compile(R"^\s|\s$")
 	graph_module = None
-	graph_module_tryorder = ['networkx2', 'pyswip']
+	graph_module_tryorder = ['networkx', 'pyswip']
 	init_similarity = 0
 	State = namedtuple("State", "length Dict")
 	Ans = namedtuple('Ans', "similarity anchors")
