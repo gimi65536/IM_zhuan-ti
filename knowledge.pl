@@ -26,11 +26,15 @@ all_node(Key, L) :-
 
 clear_register(Key) :-
 	node_register(Key, Node),
-	(	(edge(Node, AnotherNode),
+	(
+		(edge(Node, AnotherNode),
 		retract(edge(Node, AnotherNode))
 		);
 		(word(Node, Word),
 		retract(word(Node, Word))
+		);
+		(appear(Node, N),
+		retract(appear(Node, N))
 		);
 		retract(node_register(Key, Node)) % retract of node_register should be put at last!
 	).
