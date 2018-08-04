@@ -2,7 +2,7 @@ import re
 import numpy as np
 from itertools import combinations, product, chain
 from typing import List, Tuple, Any
-from collections import namedtuple
+from collections import namedtuple, deque
 from disjoint_set import disjoint_set
 from copy import deepcopy
 
@@ -54,7 +54,7 @@ class Param():
 class StringAlign():
 	c1, c2, c3 = re.compile(R"([^\w\s'])"), re.compile(R"\s+"), re.compile(R"^\s|\s$")
 	graph_module = None
-	graph_module_tryorder = ['networkx', 'pyswip']
+	graph_module_tryorder = ['networkx2', 'pyswip']
 	init_similarity = 0
 	State = namedtuple("State", "length Dict")
 	Ans = namedtuple('Ans', "similarity anchors")
@@ -159,7 +159,7 @@ class StringAlign():
 			for k, l in anchors:
 				word_set.union((i, k), (j, l))
 			sentences_set.union(i, j)
-		print(word_set)
+		#print(word_set)
 		self._big_anchor_state = {'word_set': word_set}
 		return self._big_anchor_state
 		#this function should return one that contains word_set
@@ -509,6 +509,8 @@ class StringAlign():
 			from pyswip import Prolog
 			prolog = Prolog()
 			prolog.consult('knowledge.pl')
+			#clear the previos graph which is created in this object
+			deque(prolog.query(f'clear_register({id(self)})'), maxlen = 0)
 			index = word_set.index()
 			id_word_map = {} #prevent overlapping
 			for i in range(n):
@@ -519,8 +521,8 @@ class StringAlign():
 				for j in range(len(self._l[i])):
 					prolog.assertz(f'appear({index[(i, j)]}, {i})')
 			for word_id, word in id_word_map.items():
-				prolog.assertz(f"word({word_id}, '{word}')") #word is atom, not string
-			prolog.assertz('all_node([{}])'.format(', '.join([str(i) for i in id_word_map.keys()])))
+				prolog.assertz(f"word({word_id}, '{word}')") #word is atom, not string (list of codes)
+				prolog.assertz(f'node_register({id(self)}, {word_id})') #register the word ID under a key (python ID of self)
 			self._big_anchor_state['graph'] = prolog
 			return prolog
 		elif self.graph_module is None:
@@ -547,7 +549,7 @@ class StringAlign():
 					str_list[s][i] = word
 			print('\n'.join([' '.join(s) for s in str_list]))
 		elif self.graph_module == 'pyswip':
-			query = next(G.query('all_node(L), topological_sort(L, Sol), grab_word(Sol, Words)'))
+			query = next(G.query(f'all_node({id(self)}, L), topological_sort(L, Sol), grab_word(Sol, Words)'))
 			id_list, words = query['Sol'], [str(i) for i in query['Words']] #query['Words'] is a list of Atom object (this is a problem of pyswip), so call str() to make it string.
 			id_len = {i: len(word) for i, word in zip(id_list, words)}
 			str_list = [[' ' * id_len[i] for i in id_list] for _ in range(n)]
@@ -566,7 +568,7 @@ class StringAlign():
 			votes = map(lambda word_id: sum(weight[s] for s in G.nodes[word_id]['appearance']), id_list)
 			return (G.nodes[word_id]['word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
 		elif self.graph_module == 'pyswip':
-			id_list = next(G.query('all_node(L), topological_sort(L, Sol)'))['Sol']
+			id_list = next(G.query(f'all_node({id(self)}, L), topological_sort(L, Sol)'))['Sol']
 			votes = map(lambda word_id: sum(weight[q['N']] for q in G.query(f'appear({word_id}, N)')), id_list)
 			return (next(G.query(f'word({word_id}, Word)'))['Word'] for vote, word_id in zip(votes, id_list) if vote >= threshold)
 	@classmethod
@@ -672,7 +674,11 @@ if __name__ == '__main__':
 	#x = S.big_anchor_concat_heuristic(p)
 	x = x['word_set']
 	S.print_big_anchor()
-	print(x.sets())
-	print(x.copy().sets())
+	#print(x.sets())
+	#print(x.copy().sets())
 	result = S.final_result([1.5, 1, 1, 1], 2)
+	print(list(result))
+	x = S.big_anchor_concat_heuristic(p)
+	S.print_big_anchor()
+	result = S.final_result([1.5, 1, 1, 1], 3)
 	print(list(result))
