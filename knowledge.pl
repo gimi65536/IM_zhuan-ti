@@ -1,12 +1,12 @@
 :- dynamic word/2.
 :- dynamic edge/2.
+:- dynamic appear/2.
 :- dynamic node_register/2.
 
 % is_leftist(+Node, +NodeList)
 % true if no element AnotherNode in NodeList satisfy edge(AnotherNode, Node)
 is_leftist(Node, NodeList) :-
-	\+ (member(AnotherNode, NodeList),
-		edge(AnotherNode, Node)).
+	forall(member(AnotherNode, NodeList), \+ edge(AnotherNode, Node)).
 
 % topological_sort(+NodeList, ?Return)
 % Given a node list NodeList, check if Return is a topological sorted form of NodeList
