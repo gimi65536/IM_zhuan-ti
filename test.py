@@ -640,7 +640,7 @@ class StringAlign():
 			memo: a dict recording all results of having-appeared situations made of l1, l2, and anchors.
 		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_split
 		"""
-		hashable_sign = (frozenset(l1), frozenset(l2), frozenset([tuple(i) for i in anchors]))
+		hashable_sign = (tuple(l1), tuple(l2), tuple([tuple(i) for i in anchors]))
 		if hashable_sign not in memo:
 			similarity, anchors_to_choose = param.init_value, []
 			if len(anchors) == 0:
