@@ -669,6 +669,7 @@ def give_param(way):
 		p.init_value = -np.inf
 		p.base_point = lambda l1, l2: -(len(l1) + len(l2))
 		p.merge_point = lambda l, r, a1, a2: a1.similarity + a2.similarity + 2
+    return p
 
 if __name__ == '__main__':
 	S = StringAlign()
