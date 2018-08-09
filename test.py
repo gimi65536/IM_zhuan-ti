@@ -523,6 +523,7 @@ class StringAlign():
 			for word_id, word in id_word_map.items():
 				prolog.assertz(f"word({word_id}, '{word}')") #word is atom, not string (list of codes)
 				prolog.assertz(f'node_register({id(self)}, {word_id})') #register the word ID under a key (python ID of self)
+			#prolog.assertz('all_node([{}])'.format(', '.join([str(i) for i in id_word_map.keys()])))
 			self._big_anchor_state['graph'] = prolog
 			return prolog
 		elif self.graph_module is None:
@@ -574,7 +575,7 @@ class StringAlign():
 	@classmethod
 	def compare(cls, l1: List[str], l2: List[str], param: Param):
 		anchors = cls._anchors(l1, l2)
-		return cls._compare_detail(l1, l2, param, anchors)
+		return cls._compare_detail(l1, l2, param, anchors, {})
 	@staticmethod
 	def _anchors(l1: List[str], l2: List[str]) -> List[AnchorType]:
 		"""
@@ -591,7 +592,7 @@ class StringAlign():
 			sol.extend([np.array(i) for i in product(i1, i2)])
 		return sol
 	@classmethod
-	def _compare_split(cls, l1: List[str], l2: List[str], param: Param, anchors: List[AnchorType], now_anchor: AnchorType) -> Tuple[ScoreType, List[AnchorType]]:
+	def _compare_split(cls, l1: List[str], l2: List[str], param: Param, anchors: List[AnchorType], memo: dict, now_anchor: AnchorType) -> Tuple[ScoreType, List[AnchorType]]:
 		"""
 		recursion function that always called by _compare_detail
 		deal with the step: considering an anchor being fixed, calculate the max possible point(score) it could be.
@@ -617,13 +618,13 @@ class StringAlign():
 		right_child = (l1[(now_anchor[0] + 1):], l2[(now_anchor[1] + 1):])
 		left_anchor = [anchor for anchor in anchors if np.all(anchor < now_anchor)]
 		right_anchor = [anchor - now_anchor - 1 for anchor in anchors if np.all(anchor > now_anchor)]
-		left_ans = cls._compare_detail(*left_child, param, left_anchor)
-		right_ans = cls._compare_detail(*right_child, param, right_anchor)
+		left_ans = cls._compare_detail(*left_child, param, left_anchor, memo)
+		right_ans = cls._compare_detail(*right_child, param, right_anchor, memo)
 		sol_anchor = left_ans.anchors + [now_anchor] + [anchor + now_anchor + 1 for anchor in right_ans.anchors]
 		sol_simi = param.merge_point(left_child, right_child, left_ans, right_ans)
 		return cls.Ans(sol_simi, sol_anchor)
 	@classmethod
-	def _compare_detail(cls, l1: List[str], l2: List[str], param: Param, anchors: List[AnchorType]) -> Tuple[ScoreType, List[AnchorType]]:
+	def _compare_detail(cls, l1: List[str], l2: List[str], param: Param, anchors: List[AnchorType], memo: dict) -> Tuple[ScoreType, List[AnchorType]]:
 		"""
 		recursion function that called from outside (i.e., it is the entry of recursion) or by _compare_split
 		deal with the step: given all possible anchors, I want to know which anchor, when fixing it first, can get the highest point(score)
@@ -637,16 +638,19 @@ class StringAlign():
 			anchors
 		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_split
 		"""
-		similarity, anchors_to_choose = param.init_value, []
-		if len(anchors) == 0:
-			simi, use_anchors = cls._compare_split(l1, l2, param, anchors, None) #call base case
-			if simi > similarity:
-				similarity, anchors_to_choose = simi, use_anchors
-		for anchor in anchors: #if executing above, the for-loop will not be executed
-			simi, use_anchors = cls._compare_split(l1, l2, param, anchors, np.array(anchor))
-			if simi > similarity:
-				similarity, anchors_to_choose = simi, use_anchors
-		return cls.Ans(similarity, anchors_to_choose)
+		hashable_sign = (frozenset(l1), frozenset(l2), frozenset([tuple(i) for i in anchors]))
+		if hashable_sign not in memo:
+			similarity, anchors_to_choose = param.init_value, []
+			if len(anchors) == 0:
+				simi, use_anchors = cls._compare_split(l1, l2, param, anchors, memo, None) #call base case
+				if simi > similarity:
+					similarity, anchors_to_choose = simi, use_anchors
+			for anchor in anchors: #if executing above, the for-loop will not be executed
+				simi, use_anchors = cls._compare_split(l1, l2, param, anchors, memo, np.array(anchor))
+				if simi > similarity:
+					similarity, anchors_to_choose = simi, use_anchors
+			memo[hashable_sign] = cls.Ans(similarity, anchors_to_choose)
+		return memo[hashable_sign]
 
 p = Param()
 way = 'james'
@@ -666,19 +670,23 @@ elif way == 'james':
 
 if __name__ == '__main__':
 	S = StringAlign()
-	S += ['a b c a d', 'b a d', 'a c a d a', 'a b a']
+	S += ['later that day when the princess was sitting at the table something with her coming up the marble stairs',
+	'later that day one that princess was sitting at the table something was heard coming up the marble stairs',
+	'later that day when the princess was sitting at the table something with her coming up the marble stairs',
+	'later that day when the princess was sitting at the table something was heard coming up the marbles dears']
 
 	S.evaluate(p)
 	print(S)
-	x = S.big_anchor_concat_james()
+	#x = S.big_anchor_concat_james()
 	#x = S.big_anchor_concat_heuristic(p)
-	x = x['word_set']
-	S.print_big_anchor()
+	#x = x['word_set']
+	#S.print_big_anchor()
 	#print(x.sets())
 	#print(x.copy().sets())
-	result = S.final_result([1.5, 1, 1, 1], 2)
-	print(list(result))
-	x = S.big_anchor_concat_heuristic(p)
-	S.print_big_anchor()
-	result = S.final_result([1.5, 1, 1, 1], 3)
-	print(list(result))
+	
+	#result = S.final_result([1.5, 1, 1, 1], 2)
+	#print(list(result))
+	#x = S.big_anchor_concat_heuristic(p)
+	#S.print_big_anchor()
+	#result = S.final_result([1.5, 1, 1, 1], 3)
+	#print(list(result))
