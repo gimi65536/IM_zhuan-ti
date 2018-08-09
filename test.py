@@ -529,9 +529,9 @@ class StringAlign():
 		elif self.graph_module is None:
 			print('Failed to draw graph!')
 			return
-	def print_big_anchor(self):
+	def str_big_anchor(self):
 		"""
-		test function to represent the solution
+		function to return string represent the solution
 		"""
 		G = self.give_graph()
 		if G is None:
@@ -548,7 +548,7 @@ class StringAlign():
 				word = node['word']
 				for s in node['appearance']:
 					str_list[s][i] = word
-			print('\n'.join([' '.join(s) for s in str_list]))
+			return ('\n'.join([' '.join(s) for s in str_list]))
 		elif self.graph_module == 'pyswip':
 			query = next(G.query(f'all_node({id(self)}, L), topological_sort(L, Sol), grab_word(Sol, Words)'))
 			id_list, words = query['Sol'], [str(i) for i in query['Words']] #query['Words'] is a list of Atom object (this is a problem of pyswip), so call str() to make it string.
@@ -557,7 +557,7 @@ class StringAlign():
 			for i, (word_id, word) in enumerate(zip(id_list, words)):
 				for q in G.query(f'appear({word_id}, N)'):
 					str_list[q['N']][i] = word
-			print('\n'.join([' '.join(s) for s in str_list]))
+			return ('\n'.join([' '.join(s) for s in str_list]))
 	def final_result(self, weight, threshold):
 		G = self.give_graph()
 		if G is None:
@@ -680,15 +680,15 @@ if __name__ == '__main__':
 	S.evaluate(p)
 	print(S)
 	#x = S.big_anchor_concat_james()
-	#x = S.big_anchor_concat_heuristic(p)
-	#x = x['word_set']
-	#S.print_big_anchor()
+	x = S.big_anchor_concat_heuristic(p)
+	x = x['word_set']
+	print(S.str_big_anchor())
 	#print(x.sets())
 	#print(x.copy().sets())
 	
-	#result = S.final_result([1.5, 1, 1, 1], 2)
-	#print(list(result))
+	result = S.final_result([1.5, 1, 1, 1], 2)
+	print(list(result))
 	#x = S.big_anchor_concat_heuristic(p)
-	#S.print_big_anchor()
-	#result = S.final_result([1.5, 1, 1, 1], 3)
-	#print(list(result))
+	#print(S.str_big_anchor())
+	result = S.final_result([1.5, 1, 1, 1], 3)
+	print(list(result))
