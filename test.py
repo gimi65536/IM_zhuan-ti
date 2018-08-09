@@ -609,6 +609,7 @@ class StringAlign():
 				             output the score(point)
 				             ans :: return type of _compare_xxx
 			anchors
+			memo: not used in this function. just pass it into _compare_detail
 			now_anchor: meaning which anchor is fixed at the very step.
 		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_detail
 		"""
@@ -636,6 +637,7 @@ class StringAlign():
 			param: init_value is used here.
 				init_value: the starting point(score) meaning the lower bound of scoring algorithm
 			anchors
+			memo: a dict recording all results of having-appeared situations made of l1, l2, and anchors.
 		output: ans :: Ans(float, List[anchor]), as the highest similarity, anchors, same as _compare_split
 		"""
 		hashable_sign = (frozenset(l1), frozenset(l2), frozenset([tuple(i) for i in anchors]))
